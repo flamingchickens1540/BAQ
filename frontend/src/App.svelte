@@ -1,22 +1,25 @@
 <script lang="ts">
     import { treaty } from "@elysiajs/eden"
-    import type { App } from "../../src/index.ts"
+    import type { App } from "../../src/index"
+    import type { MatchCandidate } from "../../src/team_queue"
 
     const app = treaty<App>('localhost:3000')
 
     let queue: string[] = $state([])
     let team = $state("")
+    let match: MatchCandidate | undefined = $state(undefined)
 
     async function join_queue() {
         await app.api.join_queue({team}).post()
         await get_queue()
     }
+
     async function leave_queue() {
         await app.api.leave_queue({team}).post()
         await get_queue()
     }
+
     async function get_queue() {
-        console.log("get_queue")
         const response = await app.api.get_queue.get()
         const new_queue = response.data
         if (response.status != 200 || !new_queue) {
@@ -26,15 +29,33 @@
         queue = new_queue;
     }
 
-    // const loop = async () => {setTimeout(get_queue, 500); loop()}
-    // loop()
+    async function new_match() {
+        const response = await app.api.new_match.get()
+        if (response.status == 204) {
+            return
+        }
+
+        const new_match = response.data as MatchCandidate
+        const remove_team = (team: string) => {
+            const i = queue.indexOf(team)
+            if (i == -1) return
+            queue.splice(i, 1)
+        }
+        new_match.red.forEach(remove_team)
+        new_match.blue.forEach(remove_team)
+
+        match = new_match
+    }
 </script>
 
 <div class="grid outline gap-2 p-2 rounded">
+    <div>{match?.red ?? ""}</div>
+    <div>{match?.blue ?? ""}</div>
     <input type="text" bind:value={team} class="m-2 outline p-2">
     <div>
         <button onclick={join_queue}>Join Queue</button>
         <button onclick={leave_queue}>Leave Queue</button>
+        <button onclick={new_match}>New Match</button>
     </div>
 
     <div class="flex flex-col m-2 gap-2">

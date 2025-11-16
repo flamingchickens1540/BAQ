@@ -1,11 +1,12 @@
 import { shuffleList, sum } from "./utils";
 import { TopQueue } from "./top_queue";
+import { PlayedMatrix } from "./played_matrix";
 
 const HEURISTIC_ITERATION_COUNT = 10;
 
-type Alliance = [string, string, string];
+export type Alliance = [string, string, string];
 
-type MatchCandidate = {
+export type MatchCandidate = {
 	red: Alliance;
 	blue: Alliance;
 };
@@ -16,9 +17,7 @@ type MatchCandidate = {
 //  - Number of matches played against each other team
 export class TeamQueue {
 	waiting_teams: string[] = [];
-	// Maps the team key to the index in played_matrix
-	team_map: Map<string, number> = new Map();
-	played_matrix: [number, number][][] = [];
+	played_matrix: PlayedMatrix = new PlayedMatrix();
 
 	generate_random_match(): MatchCandidate {
 		shuffleList(this.waiting_teams);
@@ -43,10 +42,13 @@ export class TeamQueue {
 	 */
 	has_played_scores(match: MatchCandidate): [string, number][] {
 		const has_played_score = (alliance: Alliance) =>
-			alliance.map((team1) => {
-				const key = this.team_map.get(team1)!;
-				return [team1, this.played_matrix[key][key][0]] as [string, number];
-			});
+			alliance.map(
+				(team) =>
+					[team, this.played_matrix.get_matches_played(team)!] as [
+						string,
+						number,
+					],
+			);
 
 		return [...has_played_score(match.red), ...has_played_score(match.blue)];
 	}
@@ -63,10 +65,10 @@ export class TeamQueue {
 						team1,
 						alliance
 							.map((team2) => {
-								const team1_key = this.team_map.get(team1)!;
-								const team2_key = this.team_map.get(team2)!;
-
-								return this.played_matrix[team1_key][team2_key][0];
+								return this.played_matrix.get_matches_played_together(
+									team1,
+									team2,
+								)!;
 							})
 							.reduce((acc, val) => acc + val),
 					] as [string, number],
@@ -90,10 +92,10 @@ export class TeamQueue {
 						team1,
 						other
 							.map((team2) => {
-								const team1_key = this.team_map.get(team1)!;
-								const team2_key = this.team_map.get(team2)!;
-
-								return this.played_matrix[team1_key][team2_key][1];
+								return this.played_matrix.get_matches_played_against(
+									team1,
+									team2,
+								)!;
 							})
 							.reduce((acc, val) => acc + val),
 					] as [string, number],
@@ -191,20 +193,38 @@ export class TeamQueue {
 			return;
 		}
 
-		let teams = this.generate_random_match();
+		let teams = this.determine_best_match();
 		return teams;
 	}
 
-	queue_team(team: string) {
+	// Adds a team to the queue if it isn't already present.
+	//
+	// If the team isn't present in the team matrix, it is inserted there as well.
+	//
+	// Returns whether the team was inserted into the queue.
+	queue_team(team: string): boolean {
+		if (this.waiting_teams.includes(team)) return false;
+
+		if (!this.played_matrix.contains_team(team)) {
+			this.played_matrix.new_team(team);
+		}
+		this.played_matrix.new_team(team);
 		this.waiting_teams.push(team);
+
+		return true;
 	}
 
-	remove_team(team: string) {
+	// Removes a team from the queue if it isn't already present.
+	//
+	// Returns whether the team was removed from the queue.
+	remove_team(team: string): boolean {
 		const i = this.waiting_teams.indexOf(team);
 		if (i == -1) {
-			return;
+			return false;
 		}
 
 		this.waiting_teams.splice(i, 1);
+
+		return true;
 	}
 }
