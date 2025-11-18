@@ -9,6 +9,7 @@
     "@elysiajs/static": "^1.4.6",
     "@tailwindcss/cli": "^4.1.17",
     "elysia": "latest",
+    "socket.io": "^4.8.1",
     "tailwindcss": "^4.1.17"
   },
   "devDependencies": {

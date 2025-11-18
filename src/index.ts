@@ -1,6 +1,7 @@
 import { Elysia, status, file } from "elysia";
 import { staticPlugin } from "@elysiajs/static";
 import { TeamQueue } from "./team_queue";
+import { Server, Socket } from "socket.io";
 
 const Log = {
 	reset: "\x1b[0m",
@@ -89,6 +90,19 @@ const api = new Elysia({ prefix: "/api" })
 
 const app = new Elysia()
 	.use(api)
+	.ws("/ws", {
+		open(ws) {
+			info(`Team ${ws.id} Connected`);
+			ws.subscribe("join_queue");
+			ws.subscribe("leave_queue");
+		},
+		message(ws, message) {
+			ws.send(message);
+		},
+		close(ws) {
+			warn(`Team ${ws.id} Left`);
+		},
+	})
 	.use(staticPlugin({ assets: "frontend/dist", prefix: "/" }))
 	.listen(3000);
 
