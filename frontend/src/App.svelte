@@ -11,7 +11,6 @@
         console.log("CONNECTED")
 
         setInterval(() => {
-            // console.log(`SENT: ping`);
             ws.send("ping");
           }, 1000);
     })
@@ -26,8 +25,11 @@
     let match: MatchCandidate | undefined = $state(undefined)
 
     ws.addEventListener("message", (message) => {
-        console.log("Received")
-        const {type, team} = message.data;
+        if (message.data == "pong") {
+            return
+        }
+        const { type, team } = JSON.parse(message.data);
+        console.log(`Received ${type} ${team}`)
         if (type == "joined_queue") {
             queue.push(team)
         } else if (type == "left_queue") {

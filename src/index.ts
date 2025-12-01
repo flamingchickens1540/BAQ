@@ -2,26 +2,28 @@ import { Elysia, status } from "elysia";
 import { staticPlugin } from "@elysiajs/static";
 import { TeamQueue } from "./team_queue";
 import Logger from "./logger";
+import { ServerWebSocket } from "bun";
 
 const app = new Elysia()
     .decorate("logger", new Logger())
-    .state("sockets", new Set<any>())
-    .derive(({ store: { sockets } }) => {
+    .decorate("sockets", new Set<ServerWebSocket<any>>())
+    .decorate("queue", new TeamQueue())
+    .resolve(({ sockets, queue }) => {
         return {
             broadcast: (message: { type: string; team: string }) => {
                 for (const ws of sockets) {
+                    console.log(`Message: ${JSON.stringify(message)}`);
                     ws.send(JSON.stringify(message));
                 }
             },
         };
     })
-    .state("queue", new TeamQueue())
     .group("/api", (app) => {
         return app
             .get("/health", () => "Health")
             .post(
                 "/join_queue/:team",
-                ({ params: { team }, store: { queue }, logger, broadcast }) => {
+                ({ params: { team }, queue, logger, broadcast }) => {
                     const added = queue.queue_team(team);
                     if (!added) {
                         logger.warn(`Team ${team} Attempted To Join`);
@@ -35,7 +37,7 @@ const app = new Elysia()
             )
             .post(
                 "/leave_queue/:team",
-                ({ params: { team }, store: { queue }, logger, broadcast }) => {
+                ({ params: { team }, queue, logger, broadcast }) => {
                     const removed = queue.remove_team(team);
                     if (!removed) {
                         logger.warn(`Team ${team} Attempted To Leave`);
@@ -47,10 +49,11 @@ const app = new Elysia()
                     return status(200);
                 },
             )
-            .get("/get_queue", ({ store: { queue } }) => {
+            .get("/get_queue", ({ queue, sockets }) => {
+                console.log(sockets);
                 return queue.waiting_teams;
             })
-            .get("/new_match", ({ store: { queue }, logger }) => {
+            .get("/new_match", ({ queue, logger }) => {
                 const new_match = queue.new_match();
                 if (!new_match) {
                     return status(204);
@@ -65,26 +68,17 @@ const app = new Elysia()
     })
     .ws("/ws", {
         open(ws) {
-            const {
-                logger,
-                broadcast: _,
-                store: { sockets },
-            } = ws.data;
+            const { logger, broadcast: _, sockets } = ws.data;
 
             logger.info(`Team ${ws.id} Connected`);
             console.log(`${JSON.stringify(sockets)}`);
-            sockets.add(ws);
+            sockets.add(ws.raw as ServerWebSocket<any>);
         },
         message(ws, message) {
-            const {
-                logger,
-                broadcast,
-                store: { sockets },
-            } = ws.data;
+            const { logger, broadcast, queue } = ws.data;
 
-            console.log(`message: ${JSON.stringify(message)}`);
             if (message == "ping") {
-                ws.pong();
+                ws.send("pong");
                 return;
             }
             let { type, team } = message as {
@@ -93,23 +87,23 @@ const app = new Elysia()
             };
 
             if (type == "join") {
-                let queued = ws.data.store.queue.queue_team(team);
+                let queued = queue.queue_team(team);
                 if (queued) {
-                    ws.data.broadcast({ type: "joined_queue", team });
-                    ws.data.logger.info(`Team ${team} Joined Queue`);
+                    broadcast({ type: "joined_queue", team });
+                    logger.info(`Team ${team} Joined Queue`);
                     return;
                 }
 
-                ws.data.logger.warn(`Team ${team} Tried To Joined Queue`);
+                logger.warn(`Team ${team} Tried To Joined Queue`);
             } else if (type == "leave") {
-                let removed = ws.data.store.queue.remove_team(team);
+                let removed = queue.remove_team(team);
                 if (removed) {
-                    ws.data.broadcast({ type: "left_queue", team });
-                    ws.data.logger.warn(`Team ${team} Left Queue`);
+                    broadcast({ type: "left_queue", team });
+                    logger.warn(`Team ${team} Left Queue`);
                     return;
                 }
 
-                ws.data.logger.error(`Team ${team} Tried To Leave Queue`);
+                logger.error(`Team ${team} Tried To Leave Queue`);
             } else {
                 ws.data.logger.error(
                     `Team ${team} Attempted to: ${type}. Unsure of message type.`,
@@ -118,7 +112,7 @@ const app = new Elysia()
         },
         close(ws) {
             ws.data.logger.warn(`Team ${ws.id} Left`);
-            ws.data.store.sockets.delete(ws.raw);
+            ws.data.sockets.delete(ws.raw as ServerWebSocket<any>);
         },
     })
     .use(staticPlugin({ assets: "frontend/dist", prefix: "/" }))
