@@ -3,20 +3,56 @@
     import type { App } from "../../src/index"
     import type { MatchCandidate } from "../../src/team_queue"
 
-    const app = treaty<App>('localhost:3000')
+    const app = treaty<App>('localhost:3000/')
+
+    const ws = new WebSocket('ws://localhost:3000/ws')
+
+    ws.addEventListener("open", () => {
+        console.log("CONNECTED")
+
+        setInterval(() => {
+            // console.log(`SENT: ping`);
+            ws.send("ping");
+          }, 1000);
+    })
+
+    ws.addEventListener("error", (e) => {
+      console.error(`WS ERROR: ${e}`);
+    });
+
 
     let queue: string[] = $state([])
     let team = $state("")
     let match: MatchCandidate | undefined = $state(undefined)
 
+    ws.addEventListener("message", (message) => {
+        console.log("Received")
+        const {type, team} = message.data;
+        if (type == "joined_queue") {
+            queue.push(team)
+        } else if (type == "left_queue") {
+            const i = queue.indexOf(team);
+            if (i == -1) {
+                console.warn(`Attempted to remove: team ${team} who was not in queue`)
+                return
+            }
+            queue.splice(i, 1)
+        }
+    })
+
+
     async function join_queue() {
-        await app.api.join_queue({team}).post()
-        await get_queue()
+        ws.send(JSON.stringify({type: "join", team }))
+        console.log("sent");
+        // await app.api.join_queue({team}).post()
+        // await get_queue()
     }
 
     async function leave_queue() {
-        await app.api.leave_queue({team}).post()
-        await get_queue()
+        ws.send(JSON.stringify({type: "leave", team }))
+
+        // await app.api.leave_queue({team}).post()
+        // await get_queue()
     }
 
     async function get_queue() {
