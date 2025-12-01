@@ -1,10 +1,26 @@
-import { Elysia, status } from "elysia";
+import { Elysia, status, t } from "elysia";
 import { staticPlugin } from "@elysiajs/static";
 import { TeamQueue } from "./team_queue";
 import Logger from "./logger";
 import { ServerWebSocket } from "bun";
+import jwt from "@elysiajs/jwt";
+
+type TeamData = {
+    name: string;
+    password: string;
+};
+
+const { teams }: { teams: TeamData[] } = await Bun.file("secrets.json").json();
+const team_map = new Map(teams.map(({ name, password }) => [name, password]));
 
 const app = new Elysia()
+    .use(
+        jwt({
+            name: "jwt",
+            secret: "Fischl von Luftschloss Narfidort",
+        }),
+    )
+    .decorate("teams", team_map)
     .decorate("logger", new Logger())
     .decorate("sockets", new Set<ServerWebSocket<any>>())
     .decorate("queue", new TeamQueue())
@@ -18,8 +34,37 @@ const app = new Elysia()
             },
         };
     })
+    .post(
+        "/login",
+        async ({ jwt, body: { team, password }, teams, cookie: { auth } }) => {
+            const real_password = teams.get(team);
+            if (!real_password) {
+                return status(400);
+            }
+
+            if (real_password != password) {
+                return status(400);
+            }
+
+            const value = await jwt.sign({ team });
+
+            auth.set({
+                value,
+                httpOnly: true,
+                maxAge: 7 * 86400,
+                path: "/api",
+            });
+        },
+        {
+            body: t.Object({
+                team: t.String(),
+                password: t.String(),
+            }),
+        },
+    )
     .group("/api", (app) => {
         return app
+
             .get("/health", () => "Health")
             .post(
                 "/join_queue/:team",

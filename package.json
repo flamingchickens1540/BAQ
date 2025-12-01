@@ -6,6 +6,7 @@
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
+    "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/static": "^1.4.6",
     "@tailwindcss/cli": "^4.1.17",
     "elysia": "latest",
