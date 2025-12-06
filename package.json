@@ -9,6 +9,7 @@
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/static": "^1.4.6",
     "@tailwindcss/cli": "^4.1.17",
+    "dotenv": "^17.2.3",
     "elysia": "latest",
     "socket.io": "^4.8.1",
     "tailwindcss": "^4.1.17"

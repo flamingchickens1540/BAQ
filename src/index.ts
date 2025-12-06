@@ -4,6 +4,9 @@ import { TeamQueue } from "./team_queue";
 import Logger from "./logger";
 import { ServerWebSocket } from "bun";
 import jwt from "@elysiajs/jwt";
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env" });
 
 type TeamData = {
     name: string;
@@ -17,7 +20,7 @@ const app = new Elysia()
     .use(
         jwt({
             name: "jwt",
-            secret: "Fischl von Luftschloss Narfidort",
+            secret: process.env.JWT_SECRET!,
         }),
     )
     .decorate("teams", team_map)
@@ -60,6 +63,12 @@ const app = new Elysia()
                 team: t.String(),
                 password: t.String(),
             }),
+            cookie: t.Object({
+                value: t.String(),
+                httpOnly: t.Boolean(),
+                maxAge: t.Number(),
+                path: t.String(),
+            }),
         },
     )
     .group("/api", (app) => {
@@ -68,7 +77,13 @@ const app = new Elysia()
             .get("/health", () => "Health")
             .post(
                 "/join_queue/:team",
-                ({ params: { team }, queue, logger, broadcast }) => {
+                async ({ queue, logger, broadcast, jwt, cookie: { auth } }) => {
+                    const token = await jwt.verify(auth.value as string);
+                    if (!token) {
+                        return status(401, "Invalid Auth");
+                    }
+                    const team = token.team as string;
+
                     const added = queue.queue_team(team);
                     if (!added) {
                         logger.warn(`Team ${team} Attempted To Join`);
@@ -82,7 +97,13 @@ const app = new Elysia()
             )
             .post(
                 "/leave_queue/:team",
-                ({ params: { team }, queue, logger, broadcast }) => {
+                async ({ jwt, cookie: { auth }, queue, logger, broadcast }) => {
+                    const token = await jwt.verify(auth.value as string);
+                    if (!token) {
+                        return status(401, "Invalid Auth");
+                    }
+                    const team = token.team as string;
+
                     const removed = queue.remove_team(team);
                     if (!removed) {
                         logger.warn(`Team ${team} Attempted To Leave`);
@@ -109,7 +130,33 @@ const app = new Elysia()
                 logger.blue(`Blue: ${new_match?.blue}`);
 
                 return new_match;
-            });
+            })
+            .get(
+                "/me",
+                async ({ jwt, cookie: { auth } }) => {
+                    const token = auth.value;
+                    if (token) {
+                        return status(401, "No Auth Token Provided");
+                    }
+                    const payload = await jwt.verify(token as string);
+
+                    if (!payload) {
+                        return status(401, "Invalid Auth Token");
+                    }
+
+                    return {
+                        team: payload.team,
+                    };
+                },
+                {
+                    cookie: t.Object({
+                        value: t.String(),
+                        httpOnly: t.Boolean(),
+                        maxAge: t.Number(),
+                        path: t.String(),
+                    }),
+                },
+            );
     })
     .ws("/ws", {
         open(ws) {
@@ -119,14 +166,26 @@ const app = new Elysia()
             console.log(`${JSON.stringify(sockets)}`);
             sockets.add(ws.raw as ServerWebSocket<any>);
         },
-        message(ws, message) {
-            const { logger, broadcast, queue } = ws.data;
+        async message(ws, message) {
+            const {
+                logger,
+                broadcast,
+                queue,
+                jwt,
+                cookie: { auth },
+            } = ws.data;
 
             if (message == "ping") {
                 ws.send("pong");
                 return;
             }
-            let { type, team } = message as {
+            const token = await jwt.verify(auth.value as string);
+            if (!token) {
+                return status(401, "Invalid Auth");
+            }
+            const team = token.team as string;
+
+            let { type } = message as {
                 type: string;
                 team: string;
             };
@@ -160,7 +219,7 @@ const app = new Elysia()
             ws.data.sockets.delete(ws.raw as ServerWebSocket<any>);
         },
     })
-    .use(staticPlugin({ assets: "frontend/dist", prefix: "/" }))
+    .use(staticPlugin({ assets: "frontend/queue/dist", prefix: "/app" }))
     .listen(3000);
 
 console.log(

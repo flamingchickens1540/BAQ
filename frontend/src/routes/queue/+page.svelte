@@ -1,9 +1,21 @@
 <script lang="ts">
-    import { treaty } from "@elysiajs/eden"
-    import type { App } from "../../src/index"
-    import type { MatchCandidate } from "../../src/team_queue"
+    import type { MatchCandidate } from "../../../../src/team_queue"
+    import {api } from "$lib/client"
+	import { onMount } from "svelte";
 
-    const app = treaty<App>('localhost:3000/')
+    let team = $state("")
+    let queue: string[] = $state([])
+    let match: MatchCandidate | undefined = $state(undefined)
+    let match_key = $state("")
+
+    onMount(async () => {
+        const res = await api.me.get()
+        if (res.status == 200) {
+            team = res.data?.team?.toString() ?? ""
+        } else {
+            console.error(`Not Logged In ${res}`)
+        }
+    })
 
     const ws = new WebSocket('ws://localhost:3000/ws')
 
@@ -19,46 +31,57 @@
       console.error(`WS ERROR: ${e}`);
     });
 
-
-    let queue: string[] = $state([])
-    let team = $state("")
-    let match: MatchCandidate | undefined = $state(undefined)
-
     ws.addEventListener("message", (message) => {
         if (message.data == "pong") {
             return
         }
+
+        if (message.data.type == "new_match") {
+            const { alliances, key}: {alliances: MatchCandidate, key: string} = JSON.parse(message.data)
+            alliances.red.forEach(remove_team)
+            alliances.blue.forEach(remove_team)
+            match = alliances
+            match_key = key
+
+            return
+        }
+
+
         const { type, team } = JSON.parse(message.data);
         console.log(`Received ${type} ${team}`)
         if (type == "joined_queue") {
             queue.push(team)
         } else if (type == "left_queue") {
+            remove_team(team)
+                    }     })
+
+    function remove_team(team: string) {
             const i = queue.indexOf(team);
             if (i == -1) {
                 console.warn(`Attempted to remove: team ${team} who was not in queue`)
                 return
             }
             queue.splice(i, 1)
-        }
-    })
+
+    }
 
 
     async function join_queue() {
-        ws.send(JSON.stringify({type: "join", team }))
+        ws.send(JSON.stringify({type: "join"}))
         console.log("sent");
         // await app.api.join_queue({team}).post()
         // await get_queue()
     }
 
     async function leave_queue() {
-        ws.send(JSON.stringify({type: "leave", team }))
+        ws.send(JSON.stringify({type: "leave"}))
 
         // await app.api.leave_queue({team}).post()
         // await get_queue()
     }
 
     async function get_queue() {
-        const response = await app.api.get_queue.get()
+        const response = await api.get_queue.get()
         const new_queue = response.data
         if (response.status != 200 || !new_queue) {
             console.warn("Get Queue Failed")
@@ -68,7 +91,7 @@
     }
 
     async function new_match() {
-        const response = await app.api.new_match.get()
+        const response = await api.new_match.get()
         if (response.status == 204) {
             return
         }
@@ -85,6 +108,14 @@
         match = new_match
     }
 </script>
+
+<div>
+    {#if team === ""}
+        <button>Login</button>
+    {:else}
+        <div>Welcome captain of team {team}</div>
+    {/if}
+</div>
 
 <div class="grid outline gap-2 p-2 rounded">
     <div>{match?.red ?? ""}</div>
