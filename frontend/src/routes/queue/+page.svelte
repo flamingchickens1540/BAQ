@@ -16,6 +16,14 @@
         } else {
             console.error(`Not Logged In ${res}`)
         }
+
+        const queue_res = await api.get_queue.get()
+        if (queue_res.status != 200) {
+            console.error("Failed to get current queue")
+            return
+        }
+
+        queue = queue_res.data ?? []
     })
 
     const ws = new WebSocket('ws://localhost:3000/ws')

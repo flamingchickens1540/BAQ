@@ -1,5 +1,4 @@
 import { Elysia, status, t } from "elysia";
-import { staticPlugin } from "@elysiajs/static";
 import { TeamQueue } from "./team_queue";
 import Logger from "./logger";
 import { ServerWebSocket } from "bun";
@@ -38,7 +37,6 @@ const app = new Elysia()
         return {
             broadcast: (message: { type: string; team: string }) => {
                 for (const ws of sockets) {
-                    console.log(`Message: ${JSON.stringify(message)}`);
                     ws.send(JSON.stringify(message));
                 }
             },
@@ -57,7 +55,6 @@ const app = new Elysia()
             }
 
             const value = await jwt.sign({ team });
-            console.log(`value: ${value}`);
 
             auth.set({
                 value,
@@ -67,7 +64,6 @@ const app = new Elysia()
                 maxAge: 7 * 86400,
                 path: "/",
             });
-            console.log(`value: ${auth.value}`);
         },
         {
             body: t.Object({
@@ -124,7 +120,6 @@ const app = new Elysia()
                 },
             )
             .get("/get_queue", ({ queue, sockets }) => {
-                console.log(sockets);
                 return queue.waiting_teams;
             })
             .get("/new_match", ({ queue, logger }) => {
@@ -168,7 +163,6 @@ const app = new Elysia()
             const { logger, broadcast: _, sockets } = ws.data;
 
             logger.info(`Team ${ws.id} Connected`);
-            console.log(`${JSON.stringify(sockets)}`);
             sockets.add(ws.raw as ServerWebSocket<any>);
         },
         async message(ws, message) {
