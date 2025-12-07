@@ -96,6 +96,7 @@ const app = new Elysia()
 
                     broadcast({ type: "joined_queue", team });
                     logger.info(`Team ${team} Joined`);
+
                     return status(200);
                 },
             )
@@ -119,7 +120,7 @@ const app = new Elysia()
                     return status(200);
                 },
             )
-            .get("/get_queue", ({ queue, sockets }) => {
+            .get("/get_queue", ({ queue }) => {
                 return queue.waiting_teams;
             })
             .get("/new_match", ({ queue, logger }) => {
@@ -178,6 +179,7 @@ const app = new Elysia()
                 ws.send("pong");
                 return;
             }
+
             const token = await jwt.verify(auth.value as string);
             if (!token) {
                 return status(401, "Invalid Auth");
