@@ -2,6 +2,7 @@
     import type { MatchCandidate } from "../../../../src/team_queue"
     import {api } from "$lib/client"
 	import { onMount } from "svelte";
+	import { goto } from "$app/navigation";
 
     let team = $state("")
     let queue: string[] = $state([])
@@ -109,9 +110,10 @@
     }
 </script>
 
-<div>
+<div class="flex-2 m-2 place-items-center">
+<div class="">
     {#if team === ""}
-        <button>Login</button>
+        <button onclick={() => goto("/login")}>Login</button>
     {:else}
         <div>Welcome captain of team {team}</div>
     {/if}
@@ -120,7 +122,6 @@
 <div class="grid outline gap-2 p-2 rounded">
     <div>{match?.red ?? ""}</div>
     <div>{match?.blue ?? ""}</div>
-    <input type="text" bind:value={team} class="m-2 outline p-2">
     <div>
         <button onclick={join_queue}>Join Queue</button>
         <button onclick={leave_queue}>Leave Queue</button>
@@ -137,4 +138,6 @@
 
 
 
+
+</div>
 

@@ -36,6 +36,8 @@
 		"vite": "^7.2.2"
 	},
 	"dependencies": {
-		"@elysiajs/eden": "^1.4.5"
+		"@elysiajs/cors": "^1.4.0",
+		"@elysiajs/eden": "^1.4.5",
+		"dotenv": "^17.2.3"
 	}
 }

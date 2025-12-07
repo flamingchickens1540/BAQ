@@ -5,16 +5,17 @@ import Logger from "./logger";
 import { ServerWebSocket } from "bun";
 import jwt from "@elysiajs/jwt";
 import dotenv from "dotenv";
+import cors from "@elysiajs/cors";
 
 dotenv.config({ path: ".env" });
 
 type TeamData = {
-    name: string;
+    team: string;
     password: string;
 };
 
 const { teams }: { teams: TeamData[] } = await Bun.file("secrets.json").json();
-const team_map = new Map(teams.map(({ name, password }) => [name, password]));
+const team_map = new Map(teams.map(({ team, password }) => [team, password]));
 
 const app = new Elysia()
     .use(
@@ -23,11 +24,17 @@ const app = new Elysia()
             secret: process.env.JWT_SECRET!,
         }),
     )
+    .use(
+        cors({
+            origin: "http://localhost:5173",
+            credentials: true,
+        }),
+    )
     .decorate("teams", team_map)
     .decorate("logger", new Logger())
     .decorate("sockets", new Set<ServerWebSocket<any>>())
     .decorate("queue", new TeamQueue())
-    .resolve(({ sockets, queue }) => {
+    .resolve(({ sockets }) => {
         return {
             broadcast: (message: { type: string; team: string }) => {
                 for (const ws of sockets) {
@@ -50,24 +57,25 @@ const app = new Elysia()
             }
 
             const value = await jwt.sign({ team });
+            console.log(`value: ${value}`);
 
             auth.set({
                 value,
                 httpOnly: true,
+                secure: false,
+                sameSite: "lax", // TODO set to 'none' in prod
                 maxAge: 7 * 86400,
-                path: "/api",
+                path: "/",
             });
+            console.log(`value: ${auth.value}`);
         },
         {
             body: t.Object({
                 team: t.String(),
                 password: t.String(),
             }),
-            cookie: t.Object({
-                value: t.String(),
-                httpOnly: t.Boolean(),
-                maxAge: t.Number(),
-                path: t.String(),
+            cookie: t.Cookie({
+                auth: t.Optional(t.String()),
             }),
         },
     )
@@ -135,7 +143,7 @@ const app = new Elysia()
                 "/me",
                 async ({ jwt, cookie: { auth } }) => {
                     const token = auth.value;
-                    if (token) {
+                    if (!token) {
                         return status(401, "No Auth Token Provided");
                     }
                     const payload = await jwt.verify(token as string);
@@ -149,11 +157,8 @@ const app = new Elysia()
                     };
                 },
                 {
-                    cookie: t.Object({
-                        value: t.String(),
-                        httpOnly: t.Boolean(),
-                        maxAge: t.Number(),
-                        path: t.String(),
+                    cookie: t.Cookie({
+                        auth: t.Optional(t.String()),
                     }),
                 },
             );
@@ -219,7 +224,7 @@ const app = new Elysia()
             ws.data.sockets.delete(ws.raw as ServerWebSocket<any>);
         },
     })
-    .use(staticPlugin({ assets: "frontend/queue/dist", prefix: "/app" }))
+    // .use(staticPlugin({ assets: "frontend/queue/dist", prefix: "/app" }))
     .listen(3000);
 
 console.log(

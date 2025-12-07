@@ -7,24 +7,26 @@
     let password = $state("")
 
     async function login() {
-        const res = await backend.login.post({team, password})
+        const res = await backend.login.post({ team, password })
         if (res.status != 200) {
             console.error("Failed to login", res)
             return
         }
-        res.data.
         goto("/queue")
     }
 </script>
 
 
-<div>
+<div class="grid place-items-center rounded outline p-2 m-56 w-screen gap-2">
     <h1>Login</h1>
 
-    <span>Team Number</span>
-    <input type="text" bind:value={team}>
-    <span>Password</span>
-    <input type="text" bind:value={password}>
-
+    <div class="grid grid-rows-2 place-items-center">
+        <span>Team Number</span>
+        <input type="text" bind:value={team}>
+    </div>
+    <div class="grid grid-rows-2 place-items-center">
+        <span>Password</span>
+        <input type="text" bind:value={password}>
+    </div>
     <button onclick={login}>Login</button>
 </div>
