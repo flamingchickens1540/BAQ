@@ -7,8 +7,8 @@ const HEURISTIC_ITERATION_COUNT = 10;
 export type Alliance = [string, string, string];
 
 export type MatchCandidate = {
-	red: Alliance;
-	blue: Alliance;
+    red: Alliance;
+    blue: Alliance;
 };
 
 // TODO
@@ -16,215 +16,240 @@ export type MatchCandidate = {
 //  - Number of each matches played
 //  - Number of matches played against each other team
 export class TeamQueue {
-	waiting_teams: string[] = [];
-	played_matrix: PlayedMatrix = new PlayedMatrix();
+    waiting_teams: string[] = [];
+    played_matrix: PlayedMatrix = new PlayedMatrix();
 
-	generate_random_match(): MatchCandidate {
-		shuffleList(this.waiting_teams);
+    /*
+     * Generates a random match, removing the selected teams from the queue
+     */
+    generate_random_match(): MatchCandidate {
+        shuffleList(this.waiting_teams);
 
-		return {
-			red: [
-				this.waiting_teams.pop()!,
-				this.waiting_teams.pop()!,
-				this.waiting_teams.pop()!,
-			],
-			blue: [
-				this.waiting_teams.pop()!,
-				this.waiting_teams.pop()!,
-				this.waiting_teams.pop()!,
-			],
-		};
-	}
+        return {
+            red: [
+                this.waiting_teams.pop()!,
+                this.waiting_teams.pop()!,
+                this.waiting_teams.pop()!,
+            ],
+            blue: [
+                this.waiting_teams.pop()!,
+                this.waiting_teams.pop()!,
+                this.waiting_teams.pop()!,
+            ],
+        };
+    }
 
-	/*
-	 * Returns an array representing wow many times each team in the match has played in total throughout the event
-	 * For considering which matches are better, lower scores are preferred
-	 */
-	has_played_scores(match: MatchCandidate): [string, number][] {
-		const has_played_score = (alliance: Alliance) =>
-			alliance.map(
-				(team) =>
-					[team, this.played_matrix.get_matches_played(team)!] as [
-						string,
-						number,
-					],
-			);
+    /*
+     * Returns an array representing wow many times each team in the match has played in total throughout the event
+     * For considering which matches are better, lower scores are preferred
+     */
+    has_played_scores(match: MatchCandidate): [string, number][] {
+        const has_played_score = (alliance: Alliance) =>
+            alliance.map(
+                (team) =>
+                    [team, this.played_matrix.get_matches_played(team)!] as [
+                        string,
+                        number,
+                    ],
+            );
 
-		return [...has_played_score(match.red), ...has_played_score(match.blue)];
-	}
+        return [
+            ...has_played_score(match.red),
+            ...has_played_score(match.blue),
+        ];
+    }
 
-	/*
-	 * Returns an array representing the number of times each team has played with each other team on its own alliance
-	 * For considering which matches are better, lower scores are preferred
-	 */
-	played_together_scores(match: MatchCandidate): [string, number][] {
-		const count_together_scores = (alliance: Alliance) =>
-			alliance.map(
-				(team1) =>
-					[
-						team1,
-						alliance
-							.map((team2) => {
-								return this.played_matrix.get_matches_played_together(
-									team1,
-									team2,
-								)!;
-							})
-							.reduce((acc, val) => acc + val),
-					] as [string, number],
-			);
+    /*
+     * Returns an array representing the number of times each team has played with each other team on its own alliance
+     * For considering which matches are better, lower scores are preferred
+     */
+    played_together_scores(match: MatchCandidate): [string, number][] {
+        const count_together_scores = (alliance: Alliance) =>
+            alliance.map(
+                (team1) =>
+                    [
+                        team1,
+                        alliance
+                            .map((team2) => {
+                                return this.played_matrix.get_matches_played_together(
+                                    team1,
+                                    team2,
+                                )!;
+                            })
+                            .reduce((acc, val) => acc + val),
+                    ] as [string, number],
+            );
 
-		let red = count_together_scores(match.red);
-		let blue = count_together_scores(match.blue);
+        let red = count_together_scores(match.red);
+        let blue = count_together_scores(match.blue);
 
-		return [...blue, ...red];
-	}
+        return [...blue, ...red];
+    }
 
-	/*
-	 * Returns the sum of how many times each team has played with each other team on its own alliance
-	 * For considering which matches are better, lower scores are preferred
-	 */
-	played_against_scores(match: MatchCandidate): [string, number][] {
-		const count_against_scores = (alliance: Alliance, other: Alliance) =>
-			alliance.map(
-				(team1) =>
-					[
-						team1,
-						other
-							.map((team2) => {
-								return this.played_matrix.get_matches_played_against(
-									team1,
-									team2,
-								)!;
-							})
-							.reduce((acc, val) => acc + val),
-					] as [string, number],
-			);
+    /*
+     * Returns the sum of how many times each team has played with each other team on its own alliance
+     * For considering which matches are better, lower scores are preferred
+     */
+    played_against_scores(match: MatchCandidate): [string, number][] {
+        const count_against_scores = (alliance: Alliance, other: Alliance) =>
+            alliance.map(
+                (team1) =>
+                    [
+                        team1,
+                        other
+                            .map((team2) => {
+                                return this.played_matrix.get_matches_played_against(
+                                    team1,
+                                    team2,
+                                )!;
+                            })
+                            .reduce((acc, val) => acc + val),
+                    ] as [string, number],
+            );
 
-		const red = count_against_scores(match.red, match.blue);
-		const blue = count_against_scores(match.blue, match.red);
+        const red = count_against_scores(match.red, match.blue);
+        const blue = count_against_scores(match.blue, match.red);
 
-		return [...blue, ...red];
-	}
+        return [...blue, ...red];
+    }
 
-	compare_matches(one: MatchCandidate, two: MatchCandidate): number {
-		return this.match_score(one) - this.match_score(two);
-	}
+    compare_matches(one: MatchCandidate, two: MatchCandidate): number {
+        return this.match_score(one) - this.match_score(two);
+    }
 
-	match_score(match: MatchCandidate): number {
-		return sum(
-			[
-				this.has_played_scores(match).map(([_team, score]) => score),
-				this.played_together_scores(match).map(([_team, score]) => score),
-				this.played_against_scores(match).map(([_team, score]) => score),
-			].flat(),
-		);
-	}
+    /*
+     * Calculates the score for a given match; a lower score being less more desirable
+     * It uses the following factors in the following order:
+     * 1. The number of matches each team has been waiting in the queue for
+     * 2. The number of times each team has played (more times -> higherscore)
+     *  - However, if a team hasn't played at all, them playing is greatly prioritized
+     * 3. The number times each team has played with other teams on its alliance
+     * 4. The number times each team has played against other teams on the opposing alliance
+     */
+    match_score(match: MatchCandidate): number {
+        const has_played = sum(
+            this.has_played_scores(match).map(([_team, score]) => score),
+        );
+        const together = sum(
+            this.played_together_scores(match).map(([_team, score]) => score),
+        );
+        const against = sum(
+            this.played_against_scores(match).map(([_team, score]) => score),
+        );
 
-	find_worst_team(match: MatchCandidate): string {
-		const played_against_scores = this.played_against_scores(match);
-		const played_together_scores = this.played_together_scores(match);
+        return has_played + together + against;
+    }
 
-		let worst = 0;
-		let worst_team;
+    /*
+     * Finds the team in the match that brings the match's score up the most
+     */
+    find_worst_team(match: MatchCandidate): string {
+        const has_played_scores = this.has_played_scores(match);
+        const played_against_scores = this.played_against_scores(match);
+        const played_together_scores = this.played_together_scores(match);
 
-		for (let i = 0; i < played_against_scores.length; i++) {
-			const [team, against] = played_against_scores[i];
-			const [_, together] = played_together_scores[i];
+        let worst = 0;
+        let worst_team;
 
-			const total = against + together;
-			if (total > worst) {
-				worst_team = team;
-			}
-		}
+        for (let i = 0; i < played_against_scores.length; i++) {
+            const [team, has] = has_played_scores[i];
+            const [_, against] = played_against_scores[i];
+            const [__, together] = played_together_scores[i];
 
-		return worst_team!;
-	} // returns the index
+            const total = against + together + has;
+            if (total > worst) {
+                worst_team = team;
+                worst = total;
+            }
+        }
 
-	adjust_match(match: MatchCandidate): MatchCandidate | undefined {
-		let cloned_match = JSON.parse(JSON.stringify(match)) as MatchCandidate;
-		const worst_team = this.find_worst_team(cloned_match);
+        return worst_team!;
+    }
 
-		// Remove the worst team
-		const new_team = this.waiting_teams.pop()!;
-		if (new_team == undefined) {
-			// We have no other options for matches here
-			return;
-		}
+    adjust_match(match: MatchCandidate): MatchCandidate | undefined {
+        let cloned_match = JSON.parse(JSON.stringify(match)) as MatchCandidate;
+        const worst_team = this.find_worst_team(cloned_match);
 
-		const red_i = cloned_match.red.indexOf(worst_team);
-		if (red_i != -1) {
-			// The order here shouldn't matter since we're only removing one element and pushing, not inserting
-			cloned_match.red.push(new_team);
+        // Remove the worst team
+        const new_team = this.waiting_teams.pop()!;
+        if (new_team == undefined) {
+            // We have no other options for matches here
+            return;
+        }
 
-			const [removed_team] = cloned_match.red.splice(red_i, 1);
-			this.waiting_teams.push(removed_team);
-		} else {
-			const blue_i = cloned_match.blue.indexOf(worst_team);
-			if (blue_i == -1) {
-				cloned_match.blue.push(new_team);
+        const red_i = cloned_match.red.indexOf(worst_team);
+        if (red_i != -1) {
+            // The order here shouldn't matter since we're only removing one element and pushing, not inserting
+            cloned_match.red.push(new_team);
 
-				const [removed_team] = cloned_match.blue.splice(red_i, 1);
-				this.waiting_teams.push(removed_team);
-			}
-			cloned_match.blue.splice(blue_i, 1);
-		}
+            const [removed_team] = cloned_match.red.splice(red_i, 1);
+            this.waiting_teams.push(removed_team);
+        } else {
+            const blue_i = cloned_match.blue.indexOf(worst_team);
+            if (blue_i == -1) {
+                cloned_match.blue.push(new_team);
 
-		return cloned_match;
-	}
+                const [removed_team] = cloned_match.blue.splice(red_i, 1);
+                this.waiting_teams.push(removed_team);
+            }
+            cloned_match.blue.splice(blue_i, 1);
+        }
 
-	determine_best_match(): MatchCandidate {
-		const initial = this.generate_random_match();
-		const matches = new TopQueue([initial], this.compare_matches);
+        return cloned_match;
+    }
 
-		for (let i = 0; i < HEURISTIC_ITERATION_COUNT; i++) {
-			const new_match = this.adjust_match(matches.top);
-			if (new_match == undefined) {
-				break;
-			}
-			matches.push(new_match);
-		}
+    determine_best_match(): MatchCandidate {
+        const initial = this.generate_random_match();
+        const matches = new TopQueue([initial], this.compare_matches);
 
-		return matches.top;
-	}
+        for (let i = 0; i < HEURISTIC_ITERATION_COUNT; i++) {
+            const new_match = this.adjust_match(matches.top);
+            if (new_match == undefined) {
+                break;
+            }
+            matches.push(new_match);
+        }
 
-	new_match(): MatchCandidate | undefined {
-		if (this.waiting_teams.length < 6) {
-			return;
-		}
+        return matches.top;
+    }
 
-		let teams = this.determine_best_match();
-		return teams;
-	}
+    new_match(): MatchCandidate | undefined {
+        if (this.waiting_teams.length < 6) {
+            return;
+        }
 
-	// Adds a team to the queue if it isn't already present.
-	//
-	// If the team isn't present in the team matrix, it is inserted there as well.
-	//
-	// Returns whether the team was inserted into the queue.
-	queue_team(team: string): boolean {
-		if (this.waiting_teams.includes(team)) return false;
+        let teams = this.determine_best_match();
+        return teams;
+    }
 
-		if (!this.played_matrix.contains_team(team)) {
-			this.played_matrix.new_team(team);
-		}
-		this.played_matrix.new_team(team);
-		this.waiting_teams.push(team);
+    // Adds a team to the queue if it isn't already present.
+    //
+    // If the team isn't present in the team matrix, it is inserted there as well.
+    //
+    // Returns whether the team was inserted into the queue.
+    queue_team(team: string): boolean {
+        if (this.waiting_teams.includes(team)) return false;
 
-		return true;
-	}
+        if (!this.played_matrix.contains_team(team)) {
+            this.played_matrix.new_team(team);
+        }
+        this.played_matrix.new_team(team);
+        this.waiting_teams.push(team);
 
-	// Removes a team from the queue if it isn't already present.
-	//
-	// Returns whether the team was removed from the queue.
-	remove_team(team: string): boolean {
-		const i = this.waiting_teams.indexOf(team);
-		if (i == -1) {
-			return false;
-		}
+        return true;
+    }
 
-		this.waiting_teams.splice(i, 1);
+    // Removes a team from the queue if it isn't already present.
+    //
+    // Returns whether the team was removed from the queue.
+    remove_team(team: string): boolean {
+        const i = this.waiting_teams.indexOf(team);
+        if (i == -1) {
+            return false;
+        }
 
-		return true;
-	}
+        this.waiting_teams.splice(i, 1);
+
+        return true;
+    }
 }

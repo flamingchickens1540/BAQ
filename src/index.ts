@@ -44,8 +44,13 @@ const app = new Elysia()
     })
     .post(
         "/login",
-        async ({ jwt, body: { team, password }, teams, cookie: { auth } }) => {
-            const real_password = teams.get(team);
+        async ({
+            jwt,
+            body: { team: name, password },
+            teams,
+            cookie: { auth },
+        }) => {
+            const real_password = teams.get(name);
             if (!real_password) {
                 return status(400);
             }
@@ -54,7 +59,7 @@ const app = new Elysia()
                 return status(400);
             }
 
-            const value = await jwt.sign({ team });
+            const value = await jwt.sign({ team: name });
 
             auth.set({
                 value,
@@ -81,12 +86,19 @@ const app = new Elysia()
             .get("/health", () => "Health")
             .post(
                 "/join_queue/:team",
-                async ({ queue, logger, broadcast, jwt, cookie: { auth } }) => {
+                async ({
+                    body: { team },
+                    queue,
+                    logger,
+                    broadcast,
+                    jwt,
+                    cookie: { auth },
+                }) => {
                     const token = await jwt.verify(auth.value as string);
                     if (!token) {
                         return status(401, "Invalid Auth");
                     }
-                    const team = token.team as string;
+                    // const team = token.team as string;
 
                     const added = queue.queue_team(team);
                     if (!added) {
@@ -99,15 +111,27 @@ const app = new Elysia()
 
                     return status(200);
                 },
+                {
+                    body: t.Object({
+                        team: t.String(),
+                    }),
+                },
             )
             .post(
                 "/leave_queue/:team",
-                async ({ jwt, cookie: { auth }, queue, logger, broadcast }) => {
+                async ({
+                    body: { team },
+                    jwt,
+                    cookie: { auth },
+                    queue,
+                    logger,
+                    broadcast,
+                }) => {
                     const token = await jwt.verify(auth.value as string);
                     if (!token) {
                         return status(401, "Invalid Auth");
                     }
-                    const team = token.team as string;
+                    // const team = token.team as string;
 
                     const removed = queue.remove_team(team);
                     if (!removed) {
@@ -118,6 +142,11 @@ const app = new Elysia()
                     broadcast({ type: "left_queue", team });
                     logger.info(`Team ${team} Left`);
                     return status(200);
+                },
+                {
+                    body: t.Object({
+                        team: t.String(),
+                    }),
                 },
             )
             .get("/get_queue", ({ queue }) => {
@@ -166,6 +195,7 @@ const app = new Elysia()
             logger.info(`Team ${ws.id} Connected`);
             sockets.add(ws.raw as ServerWebSocket<any>);
         },
+
         async message(ws, message) {
             const {
                 logger,
@@ -184,9 +214,9 @@ const app = new Elysia()
             if (!token) {
                 return status(401, "Invalid Auth");
             }
-            const team = token.team as string;
+            // const team = token.team as string;
 
-            let { type } = message as {
+            let { type, team } = message as {
                 type: string;
                 team: string;
             };

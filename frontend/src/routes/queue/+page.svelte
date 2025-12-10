@@ -10,13 +10,13 @@
     let match_key = $state("")
 
     onMount(async () => {
-        const res = await api.me.get()
-        if (res.status == 200) {
-            team = res.data?.team?.toString() ?? ""
-        } else {
-            console.error(`Not Logged In ${res}`)
-        }
-
+        // const res = await api.me.get()
+        // if (res.status == 200) {
+        //     team = res.data?.team?.toString() ?? ""
+        // } else {
+        //     console.error(`Not Logged In ${res}`)
+        // }
+        //
         const queue_res = await api.get_queue.get()
         if (queue_res.status != 200) {
             console.error("Failed to get current queue")
@@ -64,7 +64,7 @@
             remove_team(team)
                     }     })
 
-    function remove_team(team: string) {
+        function remove_team(team: string) {
             const i = queue.indexOf(team);
             if (i == -1) {
                 console.warn(`Attempted to remove: team ${team} who was not in queue`)
@@ -76,14 +76,14 @@
 
 
     async function join_queue() {
-        ws.send(JSON.stringify({type: "join"}))
+        ws.send(JSON.stringify({ type: "join", team }))
         console.log("sent");
         // await app.api.join_queue({team}).post()
         // await get_queue()
     }
 
     async function leave_queue() {
-        ws.send(JSON.stringify({type: "leave"}))
+        ws.send(JSON.stringify({ type: "leave", team }))
 
         // await app.api.leave_queue({team}).post()
         // await get_queue()
@@ -131,6 +131,7 @@
     <div>{match?.red ?? ""}</div>
     <div>{match?.blue ?? ""}</div>
     <div>
+        <input type="text" bind:value={team}/>
         <button onclick={join_queue}>Join Queue</button>
         <button onclick={leave_queue}>Leave Queue</button>
         <button onclick={new_match}>New Match</button>
