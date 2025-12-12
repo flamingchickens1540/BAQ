@@ -7,7 +7,7 @@
     let password = $state("")
 
     async function login() {
-        const res = await backend.login.post({ team, password })
+        const res = await backend.login.post({ team: team.toLowerCase(), password })
         if (res.status != 200) {
             console.error("Failed to login", res)
             return
@@ -21,7 +21,7 @@
     <h1>Login</h1>
 
     <div class="grid grid-rows-2 place-items-center">
-        <span>Team Number</span>
+        <span>Name</span>
         <input type="text" bind:value={team}>
     </div>
     <div class="grid grid-rows-2 place-items-center">

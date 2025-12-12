@@ -10,10 +10,6 @@ export type MatchCandidate = {
     blue: Alliance;
 };
 
-// TODO
-// - Create a heuristic for each match
-//  - Number of each matches played
-//  - Number of matches played against each other team
 export class TeamQueue {
     waiting_teams: string[] = [];
     played_matrix: PlayedMatrix;
@@ -159,8 +155,11 @@ export class TeamQueue {
         const against = sum(
             this.played_against_scores(match).map(([_team, score]) => score),
         );
+        const been_waiting = -sum(
+            this.waiting_in_queue_scores(match).map(([_team, score]) => score),
+        );
 
-        return has_played + together + against;
+        return has_played + together + against + been_waiting;
     }
 
     /*

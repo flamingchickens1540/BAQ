@@ -1,5 +1,5 @@
 import { Elysia, status, t } from "elysia";
-import { TeamQueue } from "./team_queue";
+import { MatchCandidate, TeamQueue } from "./team_queue";
 import Logger from "./logger";
 import { ServerWebSocket } from "bun";
 import jwt from "@elysiajs/jwt";
@@ -21,6 +21,8 @@ const { teams, admins }: { teams: TeamData[]; admins: AdminData[] } =
     await Bun.file("secrets.json").json();
 const admin_map = new Map(admins.map(({ name, password }) => [name, password]));
 const team_list = teams.map(({ team, password: _ }) => team);
+// For indirection ig
+const last_match: MatchCandidate = { red: ["", "", ""], blue: ["", "", ""] };
 
 const app = new Elysia()
     .use(
@@ -40,6 +42,7 @@ const app = new Elysia()
     .decorate("logger", new Logger())
     .decorate("sockets", new Set<ServerWebSocket<any>>())
     .decorate("queue", new TeamQueue(team_list))
+    .decorate("match", last_match)
     .resolve(({ sockets }) => {
         return {
             broadcast: (message: { type: string; team: string }) => {
@@ -171,7 +174,7 @@ const app = new Elysia()
             .get("/get_queue", ({ queue }) => {
                 return queue.waiting_teams;
             })
-            .get("/new_match", ({ queue, logger }) => {
+            .get("/new_match", ({ queue, logger, match }) => {
                 const new_match = queue.new_match();
                 if (!new_match) {
                     return status(204);
@@ -181,7 +184,17 @@ const app = new Elysia()
                 logger.red(`Red: ${new_match?.red}`);
                 logger.blue(`Blue: ${new_match?.blue}`);
 
+                match.red = new_match.red;
+                match.blue = new_match.blue;
+
                 return new_match;
+            })
+            .get("/get_match", ({ match }) => {
+                if (!match) {
+                    return status(204);
+                }
+
+                return match;
             })
             .get(
                 "/me",
