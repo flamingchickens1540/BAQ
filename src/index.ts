@@ -12,9 +12,15 @@ type TeamData = {
     team: string;
     password: string;
 };
+type AdminData = {
+    name: string;
+    password: string;
+};
 
-const { teams }: { teams: TeamData[] } = await Bun.file("secrets.json").json();
-const team_map = new Map(teams.map(({ team, password }) => [team, password]));
+const { teams, admins }: { teams: TeamData[]; admins: AdminData[] } =
+    await Bun.file("secrets.json").json();
+const admin_map = new Map(admins.map(({ name, password }) => [name, password]));
+const team_list = teams.map(({ team, password: _ }) => team);
 
 const app = new Elysia()
     .use(
@@ -29,10 +35,11 @@ const app = new Elysia()
             credentials: true,
         }),
     )
-    .decorate("teams", team_map)
+    .decorate("teams", team_list)
+    .decorate("admins", admin_map)
     .decorate("logger", new Logger())
     .decorate("sockets", new Set<ServerWebSocket<any>>())
-    .decorate("queue", new TeamQueue())
+    .decorate("queue", new TeamQueue(team_list))
     .resolve(({ sockets }) => {
         return {
             broadcast: (message: { type: string; team: string }) => {
@@ -47,10 +54,10 @@ const app = new Elysia()
         async ({
             jwt,
             body: { team: name, password },
-            teams,
+            admins,
             cookie: { auth },
         }) => {
-            const real_password = teams.get(name);
+            const real_password = admins.get(name);
             if (!real_password) {
                 return status(400);
             }
@@ -89,11 +96,16 @@ const app = new Elysia()
                 async ({
                     body: { team },
                     queue,
+                    teams,
                     logger,
                     broadcast,
                     jwt,
                     cookie: { auth },
                 }) => {
+                    console.log("Attecyting to join");
+                    if (!teams.includes(team)) {
+                        return status(204);
+                    }
                     const token = await jwt.verify(auth.value as string);
                     if (!token) {
                         return status(401, "Invalid Auth");
@@ -108,6 +120,7 @@ const app = new Elysia()
 
                     broadcast({ type: "joined_queue", team });
                     logger.info(`Team ${team} Joined`);
+                    logger.info(`New Queue: ${queue.waiting_teams}`);
 
                     return status(200);
                 },
@@ -124,14 +137,20 @@ const app = new Elysia()
                     jwt,
                     cookie: { auth },
                     queue,
+                    teams,
                     logger,
                     broadcast,
                 }) => {
+                    if (!teams.includes(team)) {
+                        return status(204);
+                    }
+
                     const token = await jwt.verify(auth.value as string);
                     if (!token) {
                         return status(401, "Invalid Auth");
                     }
                     // const team = token.team as string;
+                    //
 
                     const removed = queue.remove_team(team);
                     if (!removed) {
@@ -201,6 +220,7 @@ const app = new Elysia()
                 logger,
                 broadcast,
                 queue,
+                teams,
                 jwt,
                 cookie: { auth },
             } = ws.data;
@@ -214,12 +234,16 @@ const app = new Elysia()
             if (!token) {
                 return status(401, "Invalid Auth");
             }
-            // const team = token.team as string;
 
             let { type, team } = message as {
                 type: string;
                 team: string;
             };
+            if (!teams.includes(team)) {
+                console.log(teams);
+
+                return status(204);
+            }
 
             if (type == "join") {
                 let queued = queue.queue_team(team);
@@ -246,7 +270,6 @@ const app = new Elysia()
             }
         },
         close(ws) {
-            ws.data.logger.warn(`Team ${ws.id} Left`);
             ws.data.sockets.delete(ws.raw as ServerWebSocket<any>);
         },
     })
