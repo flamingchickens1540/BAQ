@@ -26,7 +26,7 @@
     </div>
     <div class="grid grid-rows-2 place-items-center">
         <span>Password</span>
-        <input type="text" bind:value={password}>
+        <input type="password" bind:value={password}>
     </div>
     <button onclick={login}>Login</button>
 </div>
