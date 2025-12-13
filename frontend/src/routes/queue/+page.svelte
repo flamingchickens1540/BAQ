@@ -156,7 +156,7 @@
             <button onclick={new_match} disabled={queue.length < 6} class="disabled:pointer-events-none disabled:opacity-30">New Match</button>
         </div>
 
-        <div class="flex flex-col m-2 gap-2">
+        <div class="flex flex-col m-2 gap-2 overflow-y-scroll">
             {#each queue as team}
                 <div id="item">{team}</div>
             {/each}
