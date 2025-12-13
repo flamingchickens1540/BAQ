@@ -287,7 +287,7 @@ const app = new Elysia()
         },
     })
     // .use(staticPlugin({ assets: "frontend/queue/dist", prefix: "/app" }))
-    .listen(3000);
+    .listen({ port: 3003, hostname: "0.0.0.0" });
 
 console.log(
     `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,

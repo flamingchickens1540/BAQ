@@ -28,7 +28,7 @@
         queue = queue_res.data ?? []
     })
 
-    const ws = new WebSocket('ws://localhost:3000/ws')
+    const ws = new WebSocket(`ws://${import.meta.env.VITE_API_ROUTE}/ws`)
 
     ws.addEventListener("open", () => {
         console.log("CONNECTED")
