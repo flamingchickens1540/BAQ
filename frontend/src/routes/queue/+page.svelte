@@ -8,7 +8,7 @@
     let team = $state("")
     let name = $state("")
     let queue: string[] = $state([])
-    let match: LocalStore<MatchCandidate | undefined> = $state(localStore("queue_match", undefined))
+    let match: LocalStore<MatchCandidate | {}> = $state(localStore("queue_match", {}))
     let match_key = $state("")
 
     onMount(async () => {
@@ -149,7 +149,7 @@
                 <div class="item bg-blue-400 rounded p-2">{team}</div>
             {/each}
         </div>
-                <input type="text" bind:value={team}/>
+        <input type="text" bind:value={team}/>
         <div class="grid place-content-center gap-2 grid-cols-3">
             <button onclick={join_queue} disabled={team === ""} class="disabled:pointer-events-none disabled:opacity-30">Join Queue</button>
             <button onclick={leave_queue} disabled={team === ""} class="disabled:pointer-events-none disabled:opacity-30">Leave Queue</button>

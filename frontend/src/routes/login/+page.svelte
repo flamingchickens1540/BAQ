@@ -8,6 +8,7 @@
 
     async function login() {
         const res = await backend.login.post({ team: team.toLowerCase(), password })
+        console.log(JSON.stringify(res))
         if (res.status != 200) {
             console.error("Failed to login", res)
             return
